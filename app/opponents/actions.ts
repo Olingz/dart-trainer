@@ -38,6 +38,8 @@ export async function addLocalOpponent(name: string): Promise<ActionResult> {
   }
 
   revalidatePath("/");
+  revalidatePath("/play/new");
+  revalidatePath("/play/opponents");
   return {};
 }
 
@@ -62,5 +64,7 @@ export async function deleteLocalOpponent(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/");
+  revalidatePath("/play/new");
+  revalidatePath("/play/opponents");
   return {};
 }

@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { GameSetupForm } from "@/components/game-setup-form";
-import { LocalOpponentsManager } from "@/components/local-opponents-manager";
 import { formatMatchRules } from "@/lib/match-config";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
@@ -11,11 +9,6 @@ export default async function HomePage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { data: opponents } = await supabase
-    .from("local_opponents")
-    .select("id, name")
-    .order("name", { ascending: true });
 
   const { data: activeGame } = await supabase
     .from("game_sessions")
@@ -31,7 +24,7 @@ export default async function HomePage() {
   if (activeGame?.active_player_id) {
     const { data: activePlayer } = await supabase
       .from("game_players")
-      .select("display_name, is_self, current_score")
+      .select("display_name, is_self")
       .eq("id", activeGame.active_player_id)
       .maybeSingle();
     if (activePlayer) {
@@ -76,16 +69,27 @@ export default async function HomePage() {
           </Link>
         )}
 
-        <LocalOpponentsManager opponents={opponents ?? []} />
-
-        <GameSetupForm opponents={opponents ?? []} />
-
         <Link
-          href="/stats"
-          className="flex min-h-12 items-center justify-center rounded-xl border-2 border-dart-wire px-4 text-base font-medium text-dart-cream transition-colors active:border-dart-cream"
+          href="/play/new"
+          className="font-display min-h-16 flex items-center justify-center rounded-xl border-2 border-dart-cream bg-dart-green text-2xl text-dart-cream shadow-[0_0_0_2px_var(--dart-red)] active:bg-dart-green/90"
         >
-          Statistik
+          Nyt spil
         </Link>
+
+        <nav className="flex flex-col gap-2">
+          <Link
+            href="/play/opponents"
+            className="flex min-h-12 items-center justify-center rounded-xl border-2 border-dart-wire px-4 text-base font-medium text-dart-cream active:border-dart-cream"
+          >
+            Modstandere
+          </Link>
+          <Link
+            href="/stats"
+            className="flex min-h-12 items-center justify-center rounded-xl border-2 border-dart-wire px-4 text-base font-medium text-dart-cream active:border-dart-cream"
+          >
+            Statistik
+          </Link>
+        </nav>
 
         <section className="dart-panel rounded-xl p-4">
           <p className="text-sm text-dart-muted">Logget ind som</p>
@@ -93,10 +97,6 @@ export default async function HomePage() {
             {user?.email}
           </p>
         </section>
-
-        <p className="text-center text-xs text-dart-muted">
-          Vælg 301/501, sets, legs og checkout · Bust ved 1 eller under 0
-        </p>
 
         <div className="mt-auto">
           <SignOutButton />
