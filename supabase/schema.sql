@@ -120,6 +120,9 @@ create table public.game_players (
   display_name text not null,
   player_order integer not null check (player_order >= 0),
   is_self boolean not null default false,
+  is_bot boolean not null default false,
+  bot_difficulty text
+    check (bot_difficulty is null or bot_difficulty in ('easy', 'medium', 'hard')),
   local_opponent_id uuid references public.local_opponents (id) on delete set null,
   current_score integer not null,
   sets_won integer not null default 0 check (sets_won >= 0),

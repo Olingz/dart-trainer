@@ -44,6 +44,9 @@ export function PlayerScoreboard({
                 {player.is_self && (
                   <span className="ml-1 text-xs text-dart-muted">(dig)</span>
                 )}
+                {player.is_bot && (
+                  <span className="ml-1 text-xs text-dart-muted">(bot)</span>
+                )}
                 {isActive && (
                   <span className="ml-2 text-xs font-bold uppercase text-dart-red">
                     Tur

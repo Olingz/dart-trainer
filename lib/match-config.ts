@@ -1,4 +1,5 @@
 export type CheckoutMode = "straight" | "double";
+export type BotDifficulty = "easy" | "medium" | "hard";
 
 export type GameSetupInput = {
   startScore: 301 | 501;
@@ -7,6 +8,8 @@ export type GameSetupInput = {
   checkoutMode: CheckoutMode;
   /** IDs fra local_opponents — max 5 modstandere */
   opponentIds: string[];
+  /** Spil mod bot — kan ikke kombineres med lokale modstandere */
+  botDifficulty: BotDifficulty | null;
 };
 
 export const DEFAULT_GAME_SETUP: GameSetupInput = {
@@ -15,6 +18,7 @@ export const DEFAULT_GAME_SETUP: GameSetupInput = {
   setsToWin: 1,
   checkoutMode: "straight",
   opponentIds: [],
+  botDifficulty: null,
 };
 
 export function validateGameSetup(input: GameSetupInput): string | null {
@@ -35,6 +39,15 @@ export function validateGameSetup(input: GameSetupInput): string | null {
   }
   if (input.opponentIds.length > 5) {
     return "Højst 5 modstandere ad gangen";
+  }
+  if (input.botDifficulty && input.opponentIds.length > 0) {
+    return "Vælg enten bot eller lokale modstandere";
+  }
+  if (
+    input.botDifficulty &&
+    !["easy", "medium", "hard"].includes(input.botDifficulty)
+  ) {
+    return "Ugyldig bot-sværhedsgrad";
   }
   return null;
 }

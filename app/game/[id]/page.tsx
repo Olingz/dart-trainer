@@ -39,7 +39,7 @@ export default async function GamePage({
   const { data: playerRows } = await supabase
     .from("game_players")
     .select(
-      "id, display_name, player_order, is_self, current_score, sets_won, legs_won",
+      "id, display_name, player_order, is_self, is_bot, bot_difficulty, current_score, sets_won, legs_won",
     )
     .eq("game_session_id", id)
     .order("player_order", { ascending: true });
@@ -49,6 +49,8 @@ export default async function GamePage({
     display_name: p.display_name,
     player_order: p.player_order,
     is_self: p.is_self,
+    is_bot: p.is_bot ?? false,
+    bot_difficulty: p.bot_difficulty ?? null,
     current_score: p.current_score,
     sets_won: p.sets_won,
     legs_won: p.legs_won,

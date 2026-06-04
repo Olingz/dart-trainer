@@ -17,6 +17,7 @@ import {
   sortPlayers,
   type GamePlayerState,
 } from "@/lib/multiplayer";
+import { botDisplayName } from "@/lib/bot";
 import {
   validateGameSetup,
   type GameSetupInput,
@@ -127,6 +128,8 @@ export async function createGame(
       display_name: selfDisplayName(profile, user.email),
       player_order: 0,
       is_self: true,
+      is_bot: false,
+      bot_difficulty: null,
       current_score: setup.startScore,
     },
     ...opponentRows.map((opponent, index) => ({
@@ -134,9 +137,24 @@ export async function createGame(
       display_name: opponent.name,
       player_order: index + 1,
       is_self: false,
+      is_bot: false,
+      bot_difficulty: null,
       local_opponent_id: opponent.id,
       current_score: setup.startScore,
     })),
+    ...(setup.botDifficulty
+      ? [
+          {
+            game_session_id: session.id,
+            display_name: botDisplayName(setup.botDifficulty),
+            player_order: 1,
+            is_self: false,
+            is_bot: true,
+            bot_difficulty: setup.botDifficulty,
+            current_score: setup.startScore,
+          },
+        ]
+      : []),
   ];
 
   const { data: players, error: playersError } = await supabase
@@ -201,7 +219,7 @@ export async function submitRound(
   const { data: playerRows, error: playersError } = await supabase
     .from("game_players")
     .select(
-      "id, display_name, player_order, is_self, current_score, sets_won, legs_won",
+      "id, display_name, player_order, is_self, is_bot, bot_difficulty, current_score, sets_won, legs_won",
     )
     .eq("game_session_id", gameId)
     .order("player_order", { ascending: true });
@@ -273,6 +291,8 @@ export async function submitRound(
       display_name: p.display_name,
       player_order: p.player_order,
       is_self: p.is_self,
+      is_bot: p.is_bot ?? false,
+      bot_difficulty: p.bot_difficulty ?? null,
       current_score:
         p.id === activePlayerId ? result.scoreAfter : p.current_score,
       sets_won: p.sets_won,

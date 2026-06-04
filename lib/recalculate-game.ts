@@ -67,7 +67,7 @@ export async function recalculateGameSession(
   const { data: playerRows, error: playersError } = await supabase
     .from("game_players")
     .select(
-      "id, display_name, player_order, is_self, current_score, sets_won, legs_won",
+      "id, display_name, player_order, is_self, is_bot, bot_difficulty, current_score, sets_won, legs_won",
     )
     .eq("game_session_id", gameId)
     .order("player_order", { ascending: true });
@@ -109,6 +109,8 @@ export async function recalculateGameSession(
     display_name: p.display_name,
     player_order: p.player_order,
     is_self: p.is_self,
+    is_bot: p.is_bot ?? false,
+    bot_difficulty: p.bot_difficulty ?? null,
     current_score: format.start_score,
     sets_won: 0,
     legs_won: 0,

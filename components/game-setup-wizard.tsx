@@ -8,9 +8,15 @@ import type { LocalOpponent } from "@/components/local-opponents-manager";
 import { SetupStepHeader } from "@/components/setup-step-header";
 import { FORMAT_PRESETS, type FormatPresetId } from "@/lib/format-presets";
 import {
+  BOT_DIFFICULTIES,
+  botDifficultyDescription,
+  botDisplayName,
+} from "@/lib/bot";
+import {
   checkoutModeLabel,
   DEFAULT_GAME_SETUP,
   formatMatchRules,
+  type BotDifficulty,
   type CheckoutMode,
   type GameSetupInput,
 } from "@/lib/match-config";
@@ -106,18 +112,36 @@ export function GameSetupWizard({
   const [formatPreset, setFormatPreset] = useState<FormatPresetId>("single");
   const [error, setError] = useState<string | null>(null);
 
-  const playerCount = 1 + setup.opponentIds.length;
+  const playerCount =
+    1 + setup.opponentIds.length + (setup.botDifficulty ? 1 : 0);
+
+  function selectSolo() {
+    setSetup((s) => ({ ...s, opponentIds: [], botDifficulty: null }));
+  }
+
+  function selectBot(difficulty: BotDifficulty) {
+    setSetup((s) => ({
+      ...s,
+      botDifficulty: difficulty,
+      opponentIds: [],
+    }));
+  }
 
   function toggleOpponent(id: string) {
     setSetup((s) => {
       if (s.opponentIds.includes(id)) {
         return {
           ...s,
+          botDifficulty: null,
           opponentIds: s.opponentIds.filter((oid) => oid !== id),
         };
       }
       if (s.opponentIds.length >= 5) return s;
-      return { ...s, opponentIds: [...s.opponentIds, id] };
+      return {
+        ...s,
+        botDifficulty: null,
+        opponentIds: [...s.opponentIds, id],
+      };
     });
   }
 
@@ -186,16 +210,16 @@ export function GameSetupWizard({
           <h2 className="font-display text-xl text-dart-cream">Hvem spiller?</h2>
           <p className="mt-1 text-sm text-dart-muted">
             {playerCount === 1
-              ? "Kun dig — tilføj modstandere hvis I er flere"
+              ? "Kun dig ved skiven"
               : `${playerCount} spillere ved skiven`}
           </p>
 
           <button
             type="button"
             disabled={pending}
-            onClick={() => setSetup((s) => ({ ...s, opponentIds: [] }))}
+            onClick={selectSolo}
             className={`mt-4 w-full rounded-xl border-2 px-4 py-3 text-left ${
-              setup.opponentIds.length === 0
+              setup.opponentIds.length === 0 && !setup.botDifficulty
                 ? "border-dart-cream bg-dart-green/30"
                 : "border-dart-wire"
             }`}
@@ -203,6 +227,32 @@ export function GameSetupWizard({
             <p className="font-medium text-dart-cream">Kun mig</p>
             <p className="text-xs text-dart-muted">Solo træning</p>
           </button>
+
+          <div className="mt-4">
+            <p className="text-sm font-medium text-dart-cream">Mod bot</p>
+            <div className="mt-2 flex flex-col gap-2">
+              {BOT_DIFFICULTIES.map((difficulty) => (
+                <button
+                  key={difficulty}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => selectBot(difficulty)}
+                  className={`rounded-xl border-2 px-4 py-3 text-left ${
+                    setup.botDifficulty === difficulty
+                      ? "border-dart-cream bg-dart-green/30"
+                      : "border-dart-wire"
+                  }`}
+                >
+                  <p className="font-medium text-dart-cream">
+                    {botDisplayName(difficulty)}
+                  </p>
+                  <p className="text-xs text-dart-muted">
+                    {botDifficultyDescription(difficulty)}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {opponents.length > 0 ? (
             <div className="mt-4">
@@ -364,11 +414,14 @@ export function GameSetupWizard({
           <div className="mt-4 rounded-xl border border-dart-wire/50 bg-dart-black/40 px-4 py-3 text-sm">
             <p className="text-dart-cream">
               <strong>{setup.startScore}</strong>
-              {playerCount > 1 && (
-                <>
-                  {" "}
-                  · {playerCount} spillere
-                </>
+              {setup.botDifficulty && (
+                <> · {botDisplayName(setup.botDifficulty)}</>
+              )}
+              {setup.opponentIds.length > 0 && (
+                <> · {playerCount} spillere</>
+              )}
+              {!setup.botDifficulty && setup.opponentIds.length === 0 && (
+                <> · solo</>
               )}
             </p>
             <p className="mt-1 text-dart-muted">{summaryRules}</p>

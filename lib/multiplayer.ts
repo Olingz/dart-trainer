@@ -1,10 +1,14 @@
 import { advanceAfterLegWin } from "@/lib/game-rules";
 
+import type { BotDifficulty } from "@/lib/match-config";
+
 export type GamePlayerState = {
   id: string;
   display_name: string;
   player_order: number;
   is_self: boolean;
+  is_bot: boolean;
+  bot_difficulty: BotDifficulty | null;
   current_score: number;
   sets_won: number;
   legs_won: number;

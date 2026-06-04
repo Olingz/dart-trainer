@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { abandonGame, submitRound, updateDartThrow } from "@/app/game/actions";
 import { DartInputPad } from "@/components/dart-input-pad";
@@ -18,6 +18,11 @@ import {
   type DartInput,
   type DartThrowRow,
 } from "@/lib/dart-score";
+import {
+  botThinkDelayMs,
+  generateBotVisit,
+  type BotDifficulty,
+} from "@/lib/bot";
 import { DARTS_PER_ROUND, evaluateVisit } from "@/lib/game-rules";
 import {
   checkoutModeLabel,
@@ -83,6 +88,8 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [t20Shower, setT20Shower] = useState(false);
+  const [botThinking, setBotThinking] = useState(false);
+  const botTurnStarted = useRef(false);
 
   useEffect(() => {
     if (!t20Shower) return;
@@ -108,13 +115,63 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
     game.sets_won > 0 ||
     isMultiplayer;
   const isAbandoned = game.status === "abandoned";
+  const isBotTurn =
+    Boolean(activePlayer?.is_bot) &&
+    !isComplete &&
+    !isAbandoned &&
+    !editTarget;
   const canPlay = !isAbandoned && (!isComplete || editTarget !== null);
+  const canPlayHuman = canPlay && !isBotTurn;
   const dartIndex = visitDarts.length + 1;
   const visitTotal = sumDartInputs(visitDarts);
   const visitRemaining = activeScore - visitTotal;
   const activePlayerRounds = isMultiplayer
     ? rounds.filter((r) => r.game_player_id === activePlayer?.id)
     : rounds;
+
+  useEffect(() => {
+    if (!isBotTurn || pending || !activePlayer?.bot_difficulty) {
+      botTurnStarted.current = false;
+      return;
+    }
+    if (botTurnStarted.current) return;
+    botTurnStarted.current = true;
+
+    setBotThinking(true);
+    const difficulty = activePlayer.bot_difficulty as BotDifficulty;
+    const delay = botThinkDelayMs(difficulty);
+    const timer = window.setTimeout(() => {
+      const darts = generateBotVisit(
+        activeScore,
+        game.checkout_mode,
+        difficulty,
+      );
+      startTransition(async () => {
+        const result = await submitRound(game.id, darts);
+        setBotThinking(false);
+        botTurnStarted.current = false;
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
+        setVisitDarts([]);
+        router.refresh();
+      });
+    }, delay);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    isBotTurn,
+    activePlayer?.id,
+    activeScore,
+    game.id,
+    game.checkout_mode,
+    activePlayer?.bot_difficulty,
+    pending,
+    router,
+  ]);
 
   function resetMultiplier() {
     setMultiplierMode(1);
@@ -139,6 +196,11 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
     roundNumber: number,
   ) {
     if (isAbandoned) return;
+    const round = rounds.find((r) => r.round_number === roundNumber);
+    if (round?.game_player_id) {
+      const owner = players.find((p) => p.id === round.game_player_id);
+      if (owner?.is_bot) return;
+    }
     setEditTarget({
       type: "saved",
       throwId: throwRow.id,
@@ -189,7 +251,7 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
       return;
     }
 
-    if (!canPlay || visitDarts.length >= DARTS_PER_ROUND) return;
+    if (!canPlayHuman || visitDarts.length >= DARTS_PER_ROUND) return;
 
     const next = [...visitDarts, dart];
     resetMultiplier();
@@ -326,7 +388,16 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
         </div>
       )}
 
-      {(!isComplete || editTarget) && (
+      {isBotTurn && botThinking && (
+        <div className="dart-panel rounded-xl px-4 py-6 text-center">
+          <p className="font-display text-lg text-dart-cream">
+            {activePlayer?.display_name} kaster…
+          </p>
+          <p className="mt-2 text-sm text-dart-muted">Vent et øjeblik</p>
+        </div>
+      )}
+
+      {(!isComplete || editTarget) && !isBotTurn && (
         <div className="dart-score-card rounded-2xl bg-dart-cream px-5 py-6 text-center text-dart-black">
           {isMultiplayer && activePlayer && !editTarget && (
             <p className="font-display text-lg tracking-wide text-dart-green">
@@ -355,7 +426,7 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
         </div>
       )}
 
-      {!isComplete && (
+      {!isComplete && !isBotTurn && (
         <div className="dart-panel rounded-xl p-4">
           <p className="mb-2 text-sm font-medium text-dart-muted">Denne tur</p>
           <div className="flex gap-2">
@@ -415,7 +486,7 @@ export function GamePlay({ game, players, rounds }: GamePlayProps) {
         </div>
       )}
 
-      {(canPlay || editTarget) && (
+      {(canPlayHuman || editTarget) && (
         <DartInputPad
           title={padTitle}
           hint={modeHint}
