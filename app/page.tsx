@@ -50,6 +50,13 @@ export default async function HomePage() {
 
         <StartGameButton />
 
+        <Link
+          href="/stats"
+          className="flex min-h-12 items-center justify-center rounded-xl border-2 border-dart-wire px-4 text-base font-medium text-dart-cream transition-colors active:border-dart-cream"
+        >
+          Statistik
+        </Link>
+
         <section className="dart-panel rounded-xl p-4">
           <p className="text-sm text-dart-muted">Logget ind som</p>
           <p className="mt-1 text-base font-medium break-all text-dart-cream">
