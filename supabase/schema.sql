@@ -69,6 +69,8 @@ create table public.game_sessions (
   legs_won integer not null default 0 check (legs_won >= 0),
   current_set integer not null default 1 check (current_set >= 1),
   current_leg integer not null default 1 check (current_leg >= 1),
+  active_player_id uuid,
+  winner_player_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint game_sessions_finished_when_completed check (
@@ -97,11 +99,50 @@ create trigger game_sessions_set_initial_score
   for each row execute function public.init_game_session_score();
 
 -- ----------------------------------------------------------
+-- LOKALE MODSTANDERE (gemte navne)
+-- ----------------------------------------------------------
+create table public.local_opponents (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null check (char_length(trim(name)) between 1 and 40),
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+create index local_opponents_user_id_idx on public.local_opponents (user_id);
+
+-- ----------------------------------------------------------
+-- SPILLERE I EN SESSION (dig + lokale modstandere)
+-- ----------------------------------------------------------
+create table public.game_players (
+  id uuid primary key default gen_random_uuid(),
+  game_session_id uuid not null references public.game_sessions (id) on delete cascade,
+  display_name text not null,
+  player_order integer not null check (player_order >= 0),
+  is_self boolean not null default false,
+  local_opponent_id uuid references public.local_opponents (id) on delete set null,
+  current_score integer not null,
+  sets_won integer not null default 0 check (sets_won >= 0),
+  legs_won integer not null default 0 check (legs_won >= 0),
+  created_at timestamptz not null default now(),
+  unique (game_session_id, player_order)
+);
+
+create index game_players_session_id_idx on public.game_players (game_session_id);
+
+alter table public.game_sessions
+  add constraint game_sessions_active_player_fkey
+    foreign key (active_player_id) references public.game_players (id) on delete set null,
+  add constraint game_sessions_winner_player_fkey
+    foreign key (winner_player_id) references public.game_players (id) on delete set null;
+
+-- ----------------------------------------------------------
 -- RUNDER (én tur ved skiven – typisk 3 pile)
 -- ----------------------------------------------------------
 create table public.rounds (
   id uuid primary key default gen_random_uuid(),
   game_session_id uuid not null references public.game_sessions (id) on delete cascade,
+  game_player_id uuid references public.game_players (id) on delete cascade,
   round_number integer not null check (round_number > 0),
   points_scored integer not null default 0 check (points_scored >= 0 and points_scored <= 180),
   score_before integer not null check (score_before >= 0),
@@ -156,7 +197,9 @@ create trigger game_sessions_set_updated_at
 -- Row Level Security (RLS)
 -- ----------------------------------------------------------
 alter table public.profiles enable row level security;
+alter table public.local_opponents enable row level security;
 alter table public.game_sessions enable row level security;
+alter table public.game_players enable row level security;
 alter table public.rounds enable row level security;
 alter table public.dart_throws enable row level security;
 
@@ -167,6 +210,62 @@ create policy "Profiles: select own"
 create policy "Profiles: update own"
   on public.profiles for update
   using (auth.uid() = id);
+
+create policy "Local opponents: select own"
+  on public.local_opponents for select
+  using (auth.uid() = user_id);
+
+create policy "Local opponents: insert own"
+  on public.local_opponents for insert
+  with check (auth.uid() = user_id);
+
+create policy "Local opponents: update own"
+  on public.local_opponents for update
+  using (auth.uid() = user_id);
+
+create policy "Local opponents: delete own"
+  on public.local_opponents for delete
+  using (auth.uid() = user_id);
+
+create policy "Game players: select own session"
+  on public.game_players for select
+  using (
+    exists (
+      select 1 from public.game_sessions gs
+      where gs.id = game_players.game_session_id
+        and gs.user_id = auth.uid()
+    )
+  );
+
+create policy "Game players: insert own session"
+  on public.game_players for insert
+  with check (
+    exists (
+      select 1 from public.game_sessions gs
+      where gs.id = game_players.game_session_id
+        and gs.user_id = auth.uid()
+    )
+  );
+
+create policy "Game players: update own session"
+  on public.game_players for update
+  using (
+    exists (
+      select 1 from public.game_sessions gs
+      where gs.id = game_players.game_session_id
+        and gs.user_id = auth.uid()
+    )
+  );
+
+create policy "Game players: delete own session"
+  on public.game_players for delete
+  using (
+    exists (
+      select 1 from public.game_sessions gs
+      where gs.id = game_players.game_session_id
+        and gs.user_id = auth.uid()
+    )
+  );
 
 create policy "Game sessions: select own"
   on public.game_sessions for select

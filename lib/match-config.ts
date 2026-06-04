@@ -5,6 +5,8 @@ export type GameSetupInput = {
   legsToWin: number;
   setsToWin: number;
   checkoutMode: CheckoutMode;
+  /** IDs fra local_opponents — max 5 modstandere */
+  opponentIds: string[];
 };
 
 export const DEFAULT_GAME_SETUP: GameSetupInput = {
@@ -12,6 +14,7 @@ export const DEFAULT_GAME_SETUP: GameSetupInput = {
   legsToWin: 1,
   setsToWin: 1,
   checkoutMode: "straight",
+  opponentIds: [],
 };
 
 export function validateGameSetup(input: GameSetupInput): string | null {
@@ -26,6 +29,12 @@ export function validateGameSetup(input: GameSetupInput): string | null {
   }
   if (input.checkoutMode !== "straight" && input.checkoutMode !== "double") {
     return "Ugyldig checkout-regel";
+  }
+  if (!Array.isArray(input.opponentIds)) {
+    return "Ugyldige modstandere";
+  }
+  if (input.opponentIds.length > 5) {
+    return "Højst 5 modstandere ad gangen";
   }
   return null;
 }

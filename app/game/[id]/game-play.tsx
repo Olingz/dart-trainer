@@ -6,7 +6,9 @@ import { useEffect, useState, useTransition } from "react";
 import { abandonGame, submitRound, updateDartThrow } from "@/app/game/actions";
 import { DartInputPad } from "@/components/dart-input-pad";
 import { GameStatsBar } from "@/components/game-stats-bar";
+import { PlayerScoreboard } from "@/components/player-scoreboard";
 import { TripleTwentyShower } from "@/components/triple-twenty-shower";
+import type { GamePlayerState } from "@/lib/multiplayer";
 import {
   calculateDartPoints,
   dartThrowRowToInput,
@@ -29,6 +31,8 @@ type Round = {
   points_scored: number;
   score_after: number;
   is_bust: boolean;
+  game_player_id: string | null;
+  player_name: string | null;
   dart_throws: DartThrowRow[];
 };
 
@@ -44,6 +48,14 @@ type Game = {
   legs_won: number;
   current_set: number;
   current_leg: number;
+  active_player_id: string | null;
+  winner_player_id: string | null;
+};
+
+type GamePlayProps = {
+  game: Game;
+  players: GamePlayerState[];
+  rounds: Round[];
 };
 
 type MultiplierMode = 1 | 2 | 3;
@@ -63,13 +75,7 @@ function multiplierFromDart(dart: DartInput): MultiplierMode {
   return 1;
 }
 
-export function GamePlay({
-  game,
-  rounds,
-}: {
-  game: Game;
-  rounds: Round[];
-}) {
+export function GamePlay({ game, players, rounds }: GamePlayProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [visitDarts, setVisitDarts] = useState<DartInput[]>([]);
@@ -91,13 +97,24 @@ export function GamePlay({
   }
 
   const isComplete = game.status === "completed";
+  const isMultiplayer = players.length > 1;
+  const activePlayer =
+    players.find((p) => p.id === game.active_player_id) ?? players[0];
+  const activeScore = activePlayer?.current_score ?? game.current_score;
+  const winner = players.find((p) => p.id === game.winner_player_id);
   const showMatchProgress =
-    game.sets_to_win > 1 || game.legs_to_win > 1 || game.sets_won > 0;
+    game.sets_to_win > 1 ||
+    game.legs_to_win > 1 ||
+    game.sets_won > 0 ||
+    isMultiplayer;
   const isAbandoned = game.status === "abandoned";
   const canPlay = !isAbandoned && (!isComplete || editTarget !== null);
   const dartIndex = visitDarts.length + 1;
   const visitTotal = sumDartInputs(visitDarts);
-  const visitRemaining = game.current_score - visitTotal;
+  const visitRemaining = activeScore - visitTotal;
+  const activePlayerRounds = isMultiplayer
+    ? rounds.filter((r) => r.game_player_id === activePlayer?.id)
+    : rounds;
 
   function resetMultiplier() {
     setMultiplierMode(1);
@@ -142,7 +159,7 @@ export function GamePlay({
       const next = [...visitDarts];
       next[editTarget.index] = dart;
       const outcome = evaluateVisit(
-        game.current_score,
+        activeScore,
         next,
         game.checkout_mode,
       );
@@ -177,11 +194,7 @@ export function GamePlay({
     const next = [...visitDarts, dart];
     resetMultiplier();
 
-    const outcome = evaluateVisit(
-      game.current_score,
-      next,
-      game.checkout_mode,
-    );
+    const outcome = evaluateVisit(activeScore, next, game.checkout_mode);
     if (outcome) {
       submitVisit(next);
       return;
@@ -257,7 +270,7 @@ export function GamePlay({
 
       <div className="dart-panel rounded-xl px-4 py-3 text-sm">
         <p className="font-medium text-dart-cream">{formatMatchRules(game)}</p>
-        {showMatchProgress && (
+        {!isMultiplayer && showMatchProgress && (
           <p className="mt-1 tabular-nums text-dart-muted">
             Sets {game.sets_won}/{game.sets_to_win}
             {" · "}
@@ -272,10 +285,29 @@ export function GamePlay({
         </p>
       </div>
 
+      {isMultiplayer && (
+        <PlayerScoreboard
+          players={players}
+          activePlayerId={game.active_player_id}
+          legsToWin={game.legs_to_win}
+          setsToWin={game.sets_to_win}
+          showMatchCounters={
+            game.legs_to_win > 1 ||
+            game.sets_to_win > 1 ||
+            players.some((p) => p.sets_won > 0 || p.legs_won > 0)
+          }
+        />
+      )}
+
       {isComplete && !editTarget && (
         <div className="rounded-2xl border-2 border-dart-cream bg-dart-green px-6 py-8 text-center text-dart-cream">
           <p className="font-display text-xl tracking-wide">Kamp vundet</p>
-          {showMatchProgress && (
+          {winner && (
+            <p className="mt-1 text-lg font-medium text-dart-cream/95">
+              {winner.display_name}
+            </p>
+          )}
+          {showMatchProgress && !isMultiplayer && (
             <p className="mt-1 text-sm text-dart-cream/90">
               {game.sets_won} set · {game.legs_won} legs i sidste set
             </p>
@@ -296,6 +328,11 @@ export function GamePlay({
 
       {(!isComplete || editTarget) && (
         <div className="dart-score-card rounded-2xl bg-dart-cream px-5 py-6 text-center text-dart-black">
+          {isMultiplayer && activePlayer && !editTarget && (
+            <p className="font-display text-lg tracking-wide text-dart-green">
+              {activePlayer.display_name}
+            </p>
+          )}
           <p className="font-display text-xl tracking-wide text-dart-wire">
             Resterende
           </p>
@@ -311,7 +348,10 @@ export function GamePlay({
               <span className="text-dart-wire"> · {visitTotal} pt i turen</span>
             )}
           </p>
-          <GameStatsBar rounds={rounds} currentVisitDarts={visitDarts} />
+          <GameStatsBar
+            rounds={activePlayerRounds}
+            currentVisitDarts={visitDarts}
+          />
         </div>
       )}
 
@@ -401,7 +441,14 @@ export function GamePlay({
                 className="dart-panel rounded-lg px-3 py-2 text-sm"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-dart-muted">#{round.round_number}</span>
+                  <span className="text-dart-muted">
+                    #{round.round_number}
+                    {round.player_name && (
+                      <span className="ml-1 text-dart-cream/80">
+                        · {round.player_name}
+                      </span>
+                    )}
+                  </span>
                   <span className="font-bold tabular-nums text-dart-cream">
                     {round.points_scored}
                     {round.is_bust && (

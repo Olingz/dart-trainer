@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { createGame } from "@/app/game/actions";
+import type { LocalOpponent } from "@/components/local-opponents-manager";
 import {
   DEFAULT_GAME_SETUP,
   type CheckoutMode,
@@ -54,10 +55,30 @@ function Stepper({
   );
 }
 
-export function GameSetupForm() {
+export function GameSetupForm({
+  opponents,
+}: {
+  opponents: LocalOpponent[];
+}) {
   const [pending, startTransition] = useTransition();
   const [setup, setSetup] = useState<GameSetupInput>(DEFAULT_GAME_SETUP);
   const [error, setError] = useState<string | null>(null);
+
+  function toggleOpponent(id: string) {
+    setSetup((s) => {
+      const selected = s.opponentIds.includes(id);
+      if (selected) {
+        return {
+          ...s,
+          opponentIds: s.opponentIds.filter((oid) => oid !== id),
+        };
+      }
+      if (s.opponentIds.length >= 5) {
+        return s;
+      }
+      return { ...s, opponentIds: [...s.opponentIds, id] };
+    });
+  }
 
   function startGame() {
     setError(null);
@@ -68,6 +89,8 @@ export function GameSetupForm() {
       }
     });
   }
+
+  const playerCount = 1 + setup.opponentIds.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -93,6 +116,38 @@ export function GameSetupForm() {
           ))}
         </div>
       </div>
+
+      {opponents.length > 0 && (
+        <div className="dart-panel rounded-xl p-4">
+          <p className="text-sm font-medium text-dart-cream">Modstandere</p>
+          <p className="mt-1 text-xs text-dart-muted">
+            Vælg hvem der er med ({playerCount} spillere)
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {opponents.map((opponent) => {
+              const selected = setup.opponentIds.includes(opponent.id);
+              return (
+                <button
+                  key={opponent.id}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => toggleOpponent(opponent.id)}
+                  className={`rounded-full border-2 px-4 py-2 text-sm font-medium transition-colors ${
+                    selected
+                      ? "border-dart-cream bg-dart-green text-dart-cream"
+                      : "border-dart-wire text-dart-muted active:border-dart-cream"
+                  }`}
+                >
+                  {opponent.name}
+                </button>
+              );
+            })}
+          </div>
+          {setup.opponentIds.length >= 5 && (
+            <p className="mt-2 text-xs text-dart-muted">Maks 5 modstandere</p>
+          )}
+        </div>
+      )}
 
       <Stepper
         label="Sets til at vinde kampen"
@@ -151,7 +206,11 @@ export function GameSetupForm() {
         onClick={startGame}
         className="font-display min-h-14 w-full rounded-xl border-2 border-dart-cream bg-dart-green px-4 text-2xl text-dart-cream shadow-[0_0_0_2px_var(--dart-red)] transition-opacity disabled:opacity-50 active:bg-dart-green/90"
       >
-        {pending ? "Starter…" : `Start ${setup.startScore}`}
+        {pending
+          ? "Starter…"
+          : playerCount > 1
+            ? `Start ${setup.startScore} · ${playerCount} spillere`
+            : `Start ${setup.startScore}`}
       </button>
     </div>
   );

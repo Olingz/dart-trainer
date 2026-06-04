@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { GameSetupForm } from "@/components/game-setup-form";
+import { LocalOpponentsManager } from "@/components/local-opponents-manager";
 import { formatMatchRules } from "@/lib/match-config";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
@@ -11,15 +12,34 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { data: opponents } = await supabase
+    .from("local_opponents")
+    .select("id, name")
+    .order("name", { ascending: true });
+
   const { data: activeGame } = await supabase
     .from("game_sessions")
     .select(
-      "id, current_score, start_score, started_at, checkout_mode, legs_to_win, sets_to_win",
+      "id, current_score, start_score, started_at, checkout_mode, legs_to_win, sets_to_win, active_player_id",
     )
     .eq("status", "in_progress")
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  let activeTurnLabel: string | null = null;
+  if (activeGame?.active_player_id) {
+    const { data: activePlayer } = await supabase
+      .from("game_players")
+      .select("display_name, is_self, current_score")
+      .eq("id", activeGame.active_player_id)
+      .maybeSingle();
+    if (activePlayer) {
+      activeTurnLabel = activePlayer.is_self
+        ? "Din tur"
+        : `${activePlayer.display_name}s tur`;
+    }
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col px-4 py-8">
@@ -42,6 +62,11 @@ export default async function HomePage() {
             <p className="text-sm font-bold uppercase tracking-wide text-dart-green">
               Fortsæt spil
             </p>
+            {activeTurnLabel && (
+              <p className="mt-1 text-sm font-medium text-dart-wire">
+                {activeTurnLabel}
+              </p>
+            )}
             <p className="font-display mt-1 text-5xl leading-none tabular-nums text-dart-black">
               {activeGame.current_score}
             </p>
@@ -51,7 +76,9 @@ export default async function HomePage() {
           </Link>
         )}
 
-        <GameSetupForm />
+        <LocalOpponentsManager opponents={opponents ?? []} />
+
+        <GameSetupForm opponents={opponents ?? []} />
 
         <Link
           href="/stats"
