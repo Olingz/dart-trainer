@@ -16,7 +16,12 @@ import {
   type DartInput,
   type DartThrowRow,
 } from "@/lib/dart-score";
-import { DARTS_PER_ROUND, evaluateVisit } from "@/lib/game301";
+import { DARTS_PER_ROUND, evaluateVisit } from "@/lib/game-rules";
+import {
+  checkoutModeLabel,
+  formatMatchRules,
+  type CheckoutMode,
+} from "@/lib/match-config";
 
 type Round = {
   id: string;
@@ -32,6 +37,13 @@ type Game = {
   start_score: number;
   current_score: number;
   status: string;
+  checkout_mode: CheckoutMode;
+  legs_to_win: number;
+  sets_to_win: number;
+  sets_won: number;
+  legs_won: number;
+  current_set: number;
+  current_leg: number;
 };
 
 type MultiplierMode = 1 | 2 | 3;
@@ -79,6 +91,8 @@ export function GamePlay({
   }
 
   const isComplete = game.status === "completed";
+  const showMatchProgress =
+    game.sets_to_win > 1 || game.legs_to_win > 1 || game.sets_won > 0;
   const isAbandoned = game.status === "abandoned";
   const canPlay = !isAbandoned && (!isComplete || editTarget !== null);
   const dartIndex = visitDarts.length + 1;
@@ -127,7 +141,11 @@ export function GamePlay({
     if (editTarget?.type === "visit") {
       const next = [...visitDarts];
       next[editTarget.index] = dart;
-      const outcome = evaluateVisit(game.current_score, next);
+      const outcome = evaluateVisit(
+        game.current_score,
+        next,
+        game.checkout_mode,
+      );
       cancelEdit();
       if (outcome) {
         submitVisit(next);
@@ -159,7 +177,11 @@ export function GamePlay({
     const next = [...visitDarts, dart];
     resetMultiplier();
 
-    const outcome = evaluateVisit(game.current_score, next);
+    const outcome = evaluateVisit(
+      game.current_score,
+      next,
+      game.checkout_mode,
+    );
     if (outcome) {
       submitVisit(next);
       return;
@@ -232,9 +254,32 @@ export function GamePlay({
   return (
     <div className="flex flex-col gap-6">
       <TripleTwentyShower active={t20Shower} />
+
+      <div className="dart-panel rounded-xl px-4 py-3 text-sm">
+        <p className="font-medium text-dart-cream">{formatMatchRules(game)}</p>
+        {showMatchProgress && (
+          <p className="mt-1 tabular-nums text-dart-muted">
+            Sets {game.sets_won}/{game.sets_to_win}
+            {" · "}
+            Legs {game.legs_won}/{game.legs_to_win}
+            {" · "}
+            Set {game.current_set} · Leg {game.current_leg}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-dart-muted">
+          {checkoutModeLabel(game.checkout_mode)}
+          {game.checkout_mode === "double" && " · skal slutte på double"}
+        </p>
+      </div>
+
       {isComplete && !editTarget && (
         <div className="rounded-2xl border-2 border-dart-cream bg-dart-green px-6 py-8 text-center text-dart-cream">
-          <p className="font-display text-xl tracking-wide">Spil slut</p>
+          <p className="font-display text-xl tracking-wide">Kamp vundet</p>
+          {showMatchProgress && (
+            <p className="mt-1 text-sm text-dart-cream/90">
+              {game.sets_won} set · {game.legs_won} legs i sidste set
+            </p>
+          )}
           <p className="font-display mt-2 text-5xl leading-none tabular-nums">
             {game.start_score} → 0
           </p>

@@ -9,13 +9,24 @@ import {
   validateVisitDarts,
   type DartInput,
 } from "@/lib/dart-score";
-import { evaluateVisit } from "@/lib/game301";
+import { advanceAfterLegWin, evaluateVisit } from "@/lib/game-rules";
+import {
+  validateGameSetup,
+  type GameSetupInput,
+} from "@/lib/match-config";
 import { recalculateGameSession } from "@/lib/recalculate-game";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { error?: string };
 
-export async function createGame301(): Promise<void> {
+export async function createGame(
+  setup: GameSetupInput,
+): Promise<ActionResult> {
+  const validationError = validateGameSetup(setup);
+  if (validationError) {
+    return { error: validationError };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,14 +40,17 @@ export async function createGame301(): Promise<void> {
     .from("game_sessions")
     .insert({
       user_id: user.id,
-      start_score: 301,
-      current_score: 301,
+      start_score: setup.startScore,
+      current_score: setup.startScore,
+      checkout_mode: setup.checkoutMode,
+      legs_to_win: setup.legsToWin,
+      sets_to_win: setup.setsToWin,
     })
     .select("id")
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    return { error: error.message };
   }
 
   redirect(`/game/${data.id}`);
@@ -62,7 +76,9 @@ export async function submitRound(
 
   const { data: game, error: gameError } = await supabase
     .from("game_sessions")
-    .select("id, user_id, current_score, status")
+    .select(
+      "id, user_id, current_score, start_score, status, checkout_mode, legs_to_win, sets_to_win, sets_won, legs_won, current_set, current_leg",
+    )
     .eq("id", gameId)
     .single();
 
@@ -84,7 +100,11 @@ export async function submitRound(
     .eq("game_session_id", gameId);
 
   const roundNumber = (count ?? 0) + 1;
-  const result = evaluateVisit(game.current_score, darts);
+  const result = evaluateVisit(
+    game.current_score,
+    darts,
+    game.checkout_mode,
+  );
 
   if (!result) {
     return { error: "Turen er ikke afsluttet endnu" };
@@ -97,7 +117,7 @@ export async function submitRound(
       round_number: roundNumber,
       points_scored: result.pointsScored,
       score_before: result.scoreBefore,
-      score_after: result.scoreAfter,
+      score_after: result.isWin ? 0 : result.scoreAfter,
       is_bust: result.isBust,
     })
     .select("id")
@@ -119,17 +139,36 @@ export async function submitRound(
     return { error: throwsError.message };
   }
 
-  const sessionUpdate: {
-    current_score: number;
-    status?: "completed";
-    finished_at?: string;
-  } = {
+  const sessionUpdate: Record<string, unknown> = {
     current_score: result.scoreAfter,
   };
 
   if (result.isWin) {
-    sessionUpdate.status = "completed";
-    sessionUpdate.finished_at = new Date().toISOString();
+    const advanced = advanceAfterLegWin(
+      {
+        setsWon: game.sets_won,
+        legsWon: game.legs_won,
+        currentSet: game.current_set,
+        currentLeg: game.current_leg,
+      },
+      {
+        legsToWin: game.legs_to_win,
+        setsToWin: game.sets_to_win,
+      },
+    );
+
+    sessionUpdate.sets_won = advanced.counters.setsWon;
+    sessionUpdate.legs_won = advanced.counters.legsWon;
+    sessionUpdate.current_set = advanced.counters.currentSet;
+    sessionUpdate.current_leg = advanced.counters.currentLeg;
+
+    if (advanced.matchComplete) {
+      sessionUpdate.status = "completed";
+      sessionUpdate.current_score = 0;
+      sessionUpdate.finished_at = new Date().toISOString();
+    } else {
+      sessionUpdate.current_score = game.start_score;
+    }
   }
 
   const { error: updateError } = await supabase
@@ -188,7 +227,9 @@ export async function updateDartThrow(
 
   const { data: session, error: sessionError } = await supabase
     .from("game_sessions")
-    .select("id, user_id, start_score, status")
+    .select(
+      "id, user_id, start_score, status, checkout_mode, legs_to_win, sets_to_win",
+    )
     .eq("id", round.game_session_id)
     .single();
 
@@ -220,11 +261,12 @@ export async function updateDartThrow(
     return { error: updateError.message };
   }
 
-  const recalc = await recalculateGameSession(
-    supabase,
-    gameId,
-    session.start_score,
-  );
+  const recalc = await recalculateGameSession(supabase, gameId, {
+    start_score: session.start_score,
+    checkout_mode: session.checkout_mode,
+    legs_to_win: session.legs_to_win,
+    sets_to_win: session.sets_to_win,
+  });
 
   if (recalc.error) {
     return { error: recalc.error };

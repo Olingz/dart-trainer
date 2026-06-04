@@ -21,7 +21,9 @@ export default async function GamePage({
 
   const { data: game, error } = await supabase
     .from("game_sessions")
-    .select("id, start_score, current_score, status, user_id")
+    .select(
+      "id, start_score, current_score, status, user_id, checkout_mode, legs_to_win, sets_to_win, sets_won, legs_won, current_set, current_leg",
+    )
     .eq("id", id)
     .single();
 

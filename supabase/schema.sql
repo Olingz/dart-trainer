@@ -14,6 +14,8 @@ create type public.game_session_status as enum (
   'abandoned'
 );
 
+create type public.checkout_mode as enum ('straight', 'double');
+
 -- ----------------------------------------------------------
 -- BRUGERE (app-profil knyttet til Supabase Auth)
 -- auth.users håndterer login; profiles er din app-data
@@ -58,10 +60,19 @@ create table public.game_sessions (
   status public.game_session_status not null default 'in_progress',
   started_at timestamptz not null default now(),
   finished_at timestamptz,
+  checkout_mode public.checkout_mode not null default 'straight',
+  legs_to_win integer not null default 1
+    check (legs_to_win >= 1 and legs_to_win <= 21),
+  sets_to_win integer not null default 1
+    check (sets_to_win >= 1 and sets_to_win <= 21),
+  sets_won integer not null default 0 check (sets_won >= 0),
+  legs_won integer not null default 0 check (legs_won >= 0),
+  current_set integer not null default 1 check (current_set >= 1),
+  current_leg integer not null default 1 check (current_leg >= 1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint game_sessions_finished_when_completed check (
-    (status = 'completed' and current_score = 0 and finished_at is not null)
+    (status = 'completed' and finished_at is not null)
     or (status <> 'completed')
   )
 );

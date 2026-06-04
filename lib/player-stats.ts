@@ -20,6 +20,9 @@ export type StatsGame = {
   id: string;
   status: string;
   start_score: number;
+  checkout_mode: "straight" | "double";
+  legs_to_win: number;
+  sets_to_win: number;
   started_at: string;
   finished_at: string | null;
   rounds: StatsRound[];
@@ -29,6 +32,9 @@ export type RecentGameSummary = {
   id: string;
   status: string;
   startScore: number;
+  checkoutMode: "straight" | "double";
+  legsToWin: number;
+  setsToWin: number;
   startedAt: string;
   finishedAt: string | null;
   roundCount: number;
@@ -87,6 +93,9 @@ function summarizeGame(game: StatsGame): RecentGameSummary {
     id: game.id,
     status: game.status,
     startScore: game.start_score,
+    checkoutMode: game.checkout_mode,
+    legsToWin: game.legs_to_win,
+    setsToWin: game.sets_to_win,
     startedAt: game.started_at,
     finishedAt: game.finished_at,
     roundCount: game.rounds.length,

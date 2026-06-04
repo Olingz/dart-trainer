@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { StartGameButton } from "@/components/start-game-button";
+import { GameSetupForm } from "@/components/game-setup-form";
+import { formatMatchRules } from "@/lib/match-config";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +13,9 @@ export default async function HomePage() {
 
   const { data: activeGame } = await supabase
     .from("game_sessions")
-    .select("id, current_score, start_score, started_at")
+    .select(
+      "id, current_score, start_score, started_at, checkout_mode, legs_to_win, sets_to_win",
+    )
     .eq("status", "in_progress")
     .order("started_at", { ascending: false })
     .limit(1)
@@ -22,7 +25,7 @@ export default async function HomePage() {
     <div className="flex min-h-full flex-1 flex-col px-4 py-8">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col gap-6">
         <header className="text-center">
-          <p className="font-display text-2xl tracking-widest text-dart-red">301</p>
+          <p className="font-display text-2xl tracking-widest text-dart-red">X01</p>
           <h1 className="font-display mt-0 text-4xl leading-none text-dart-cream">
             Dart Trainer
           </h1>
@@ -43,12 +46,12 @@ export default async function HomePage() {
               {activeGame.current_score}
             </p>
             <p className="mt-1 text-sm text-dart-wire">
-              resterende af {activeGame.start_score}
+              {formatMatchRules(activeGame)} · resterende af {activeGame.start_score}
             </p>
           </Link>
         )}
 
-        <StartGameButton />
+        <GameSetupForm />
 
         <Link
           href="/stats"
@@ -65,7 +68,7 @@ export default async function HomePage() {
         </section>
 
         <p className="text-center text-xs text-dart-muted">
-          Tryk tal = single · Double/Triple før felt · Bust ved 1 eller under 0
+          Vælg 301/501, sets, legs og checkout · Bust ved 1 eller under 0
         </p>
 
         <div className="mt-auto">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { formatMatchRules } from "@/lib/match-config";
 import {
   computePlayerStats,
   formatAverage,
@@ -50,6 +51,9 @@ export default async function StatsPage() {
       id,
       status,
       start_score,
+      checkout_mode,
+      legs_to_win,
+      sets_to_win,
       started_at,
       finished_at,
       rounds (
@@ -193,7 +197,12 @@ export default async function StatsPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm text-dart-cream">
-                            301 · {game.startScore}
+                            {formatMatchRules({
+                              start_score: game.startScore,
+                              checkout_mode: game.checkoutMode,
+                              legs_to_win: game.legsToWin,
+                              sets_to_win: game.setsToWin,
+                            })}
                           </p>
                           <p className="text-xs text-dart-muted">
                             {formatDate(game.startedAt)}
