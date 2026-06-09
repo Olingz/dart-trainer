@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, Bebas_Neue } from "next/font/google";
+
+import { BetaBanner } from "@/components/beta-banner";
+import { getDeployUrl } from "@/lib/deploy";
 import "./globals.css";
 
 const dartDisplay = Bebas_Neue({
@@ -14,9 +17,16 @@ const dartBody = Barlow_Condensed({
   variable: "--font-dart-body",
 });
 
+const deployUrl = getDeployUrl();
+
 export const metadata: Metadata = {
   title: "Dart Trainer",
-  description: "Dart-træning — 301 og mere",
+  description: "Dart-træning — 301, 501, bot og lokale modstandere",
+  ...(deployUrl ? { metadataBase: new URL(deployUrl) } : {}),
+  appleWebApp: {
+    capable: true,
+    title: "Dart Trainer",
+  },
 };
 
 export const viewport = {
@@ -36,6 +46,7 @@ export default function RootLayout({
       className={`${dartDisplay.variable} ${dartBody.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-dart-black font-sans text-dart-cream">
+        <BetaBanner />
         {children}
       </body>
     </html>

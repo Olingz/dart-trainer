@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     return loginWithAuthError(
       origin,
       error.message ||
-        "Kunne ikke fuldføre login. Brug samme adresse (fx 192.168.0.147) før og efter Google.",
+        "Kunne ikke fuldføre login. Tjek at Supabase Site URL matcher appens adresse.",
     );
   }
 
