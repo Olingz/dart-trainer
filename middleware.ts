@@ -106,7 +106,7 @@ async function updateSession(request: NextRequest) {
   return supabaseResponse;
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   try {
     const oauthRedirect = redirectOAuthCodeToCallback(request);
     if (oauthRedirect) {
@@ -114,7 +114,7 @@ export async function proxy(request: NextRequest) {
     }
     return await updateSession(request);
   } catch (error) {
-    console.error("Proxy error:", error);
+    console.error("Middleware error:", error);
     return new NextResponse("Serverfejl. Prøv at redeploy på Vercel.", {
       status: 500,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
