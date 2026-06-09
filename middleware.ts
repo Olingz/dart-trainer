@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getSafeOrigin } from "@/lib/app-url";
-import { updateSession } from "@/lib/supabase/middleware";
+import { getSafeOrigin } from "./lib/app-url";
+import { updateSession } from "./lib/supabase/middleware";
 
 /** Supabase sender nogle gange ?code= til Site URL (/) i stedet for /auth/callback. */
 function redirectOAuthCodeToCallback(request: NextRequest) {
