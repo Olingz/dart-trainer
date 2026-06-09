@@ -29,12 +29,20 @@ function redirectOAuthCodeToCallback(request: NextRequest) {
 }
 
 export async function middleware(request: NextRequest) {
-  const oauthRedirect = redirectOAuthCodeToCallback(request);
-  if (oauthRedirect) {
-    return oauthRedirect;
-  }
+  try {
+    const oauthRedirect = redirectOAuthCodeToCallback(request);
+    if (oauthRedirect) {
+      return oauthRedirect;
+    }
 
-  return await updateSession(request);
+    return await updateSession(request);
+  } catch (error) {
+    console.error("Middleware error:", error);
+    return new NextResponse("Serverfejl i middleware. Prøv at redeploy på Vercel.", {
+      status: 500,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
 }
 
 export const config = {
